@@ -23,6 +23,8 @@ func New(s *store.Store, projectRoot string) *Scanner {
 
 func (s *Scanner) Run() (core.ScanReport, error) {
 	var report core.ScanReport
+	st, err := s.Store.LoadState()
+	if err != nil { return report, err }
 	byName := map[string][]core.Installation{}
 	for _, h := range s.Harnesses {
 		hi := core.HarnessInfo{Name:h.Name(), Detected:h.Detect(), Locations:h.SkillLocations(s.ProjectRoot)}
@@ -52,6 +54,9 @@ func (s *Scanner) Run() (core.ScanReport, error) {
 						resolved, _ := filepath.Abs(target)
 						inst.Managed = canon == resolved
 					}
+				}
+				if !inst.Managed && ownedTarget(st, name, h.Name(), path) {
+					inst.Managed = true
 				}
 				if !inst.Broken {
 					if hash, err := fsutil.HashDir(path); err == nil {
@@ -96,4 +101,17 @@ func (s *Scanner) Run() (core.ScanReport, error) {
 	})
 	sort.Slice(report.Conflicts, func(i,j int) bool { return report.Conflicts[i].Name < report.Conflicts[j].Name })
 	return report, nil
+}
+
+func ownedTarget(st core.State, skill, harness, path string) bool {
+	if st.ManagedTargets[skill] == nil {
+		return false
+	}
+	recorded := st.ManagedTargets[skill][harness]
+	if recorded == "" {
+		return false
+	}
+	a, _ := filepath.Abs(recorded)
+	b, _ := filepath.Abs(path)
+	return a == b
 }

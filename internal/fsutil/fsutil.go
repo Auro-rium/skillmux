@@ -2,6 +2,7 @@ package fsutil
 
 import (
 	"crypto/sha256"
+	"fmt"
 	"encoding/hex"
 	"errors"
 	"io"
@@ -12,6 +13,9 @@ import (
 	"strings"
 )
 
+// HashDir computes a deterministic content hash for a skill tree. Git metadata is
+// deliberately excluded because a cloned source repository is not part of the
+// skill itself.
 func HashDir(root string) (string, error) {
 	info, err := os.Lstat(root)
 	if err != nil {
@@ -29,12 +33,18 @@ func HashDir(root string) (string, error) {
 		if err != nil {
 			return err
 		}
-		if d.IsDir() {
+		rel, relErr := filepath.Rel(root, path)
+		if relErr != nil {
+			return relErr
+		}
+		if isGitMetadata(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
 			return nil
 		}
-		rel, err := filepath.Rel(root, path)
-		if err != nil {
-			return err
+		if d.IsDir() {
+			return nil
 		}
 		paths = append(paths, filepath.ToSlash(rel))
 		return nil
@@ -62,6 +72,51 @@ func HashDir(root string) (string, error) {
 	return "sha256:" + hex.EncodeToString(h.Sum(nil)), nil
 }
 
+// ValidateTree rejects symlinks that resolve outside the source tree. This is
+// required before importing externally sourced skills so a malicious repository
+// cannot smuggle an escaping symlink into the canonical library.
+func ValidateTree(root string) error {
+	rootAbs, err := filepath.Abs(root)
+	if err != nil {
+		return err
+	}
+	rootReal, err := filepath.EvalSymlinks(rootAbs)
+	if err != nil {
+		return err
+	}
+	return filepath.WalkDir(rootAbs, func(path string, d fs.DirEntry, err error) error {
+		if err != nil {
+			return err
+		}
+		rel, relErr := filepath.Rel(rootAbs, path)
+		if relErr != nil {
+			return relErr
+		}
+		if isGitMetadata(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
+		}
+		if d.Type()&os.ModeSymlink == 0 {
+			return nil
+		}
+		target, evalErr := filepath.EvalSymlinks(path)
+		if evalErr != nil {
+			return fmt.Errorf("broken symlink %s: %w", path, evalErr)
+		}
+		targetAbs, absErr := filepath.Abs(target)
+		if absErr != nil {
+			return absErr
+		}
+		inside, relErr := filepath.Rel(rootReal, targetAbs)
+		if relErr != nil || inside == ".." || strings.HasPrefix(inside, ".."+string(filepath.Separator)) {
+			return fmt.Errorf("symlink %s resolves outside the skill tree", rel)
+		}
+		return nil
+	})
+}
+
 func CopyDir(src, dst string) error {
 	srcInfo, err := os.Stat(src)
 	if err != nil {
@@ -77,6 +132,12 @@ func CopyDir(src, dst string) error {
 		rel, err := filepath.Rel(src, path)
 		if err != nil {
 			return err
+		}
+		if isGitMetadata(rel) {
+			if d.IsDir() {
+				return filepath.SkipDir
+			}
+			return nil
 		}
 		target := filepath.Join(dst, rel)
 		if d.IsDir() {
@@ -151,4 +212,20 @@ func SafeName(name string) bool {
 		}
 	}
 	return true
+}
+
+func isGitMetadata(rel string) bool {
+	rel = filepath.Clean(rel)
+	if rel == "." || rel == "" {
+		return false
+	}
+	parts := strings.FieldsFunc(rel, func(r rune) bool {
+		return r == '/' || r == '\\'
+	})
+	for _, part := range parts {
+		if part == ".git" {
+			return true
+		}
+	}
+	return false
 }

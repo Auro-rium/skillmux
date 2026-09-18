@@ -203,7 +203,7 @@ func runSync(a *app.App, args []string) {
 	force := fs.Bool("force", false, "replace differing targets after review")
 	parse(fs, args)
 
-	plan, err := a.Sync(true, *force)
+	plan, err := a.ProjectSync(context.Background(), true, *force)
 	must(err)
 	if *jsonOut { printJSON(plan) } else { renderPlan(plan) }
 	if *dry || len(plan.Changes) == 0 { return }
@@ -214,7 +214,7 @@ func runSync(a *app.App, args []string) {
 			return
 		}
 	}
-	_, err = a.Sync(false, *force)
+	_, err = a.ProjectSync(context.Background(), false, *force)
 	must(err)
 	if !*jsonOut { fmt.Println("Sync complete.") }
 }

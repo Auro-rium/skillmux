@@ -3,6 +3,7 @@ package app
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"testing"
 
 	"github.com/Auro-rium/skillmux/internal/core"
@@ -47,7 +48,14 @@ func TestImportCanonicalizesExistingCopy(t *testing.T) {
 	}
 	info, err := os.Lstat(filepath.Join(harnessRoot, "existing"))
 	if err != nil { t.Fatal(err) }
-	if info.Mode()&os.ModeSymlink == 0 {
-		t.Fatal("imported target should be canonicalized to a symlink")
+	if runtime.GOOS != "windows" {
+		if info.Mode()&os.ModeSymlink == 0 {
+			t.Fatal("imported target should be canonicalized to a symlink on Unix")
+		}
+	}
+	st, err := s.LoadState()
+	if err != nil { t.Fatal(err) }
+	if st.ManagedTargets["existing"]["codex"] == "" {
+		t.Fatal("imported target should be tracked as managed")
 	}
 }

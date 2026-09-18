@@ -99,8 +99,7 @@ func (s *Store) SaveState(st core.State) error {
 	if err != nil {
 		return err
 	}
-	data = append(data, '
-')
+	data = append(data, '\n')
 	return fsutil.AtomicWrite(s.statePath(), data, 0o600)
 }
 
@@ -156,8 +155,7 @@ func description(path string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	lines := strings.Split(string(data), "
-")
+	lines := strings.Split(string(data), "\n")
 	inFront := false
 	for i, line := range lines {
 		t := strings.TrimSpace(line)
@@ -169,7 +167,7 @@ func description(path string) (string, error) {
 			break
 		}
 		if inFront && strings.HasPrefix(strings.ToLower(t), "description:") {
-			return strings.Trim(strings.TrimSpace(strings.TrimPrefix(t, "description:")), ""'"), nil
+			return strings.Trim(strings.TrimSpace(strings.TrimPrefix(t, "description:")), "\"'"), nil
 		}
 		if !inFront && strings.HasPrefix(t, "# ") && i+1 < len(lines) {
 			for _, next := range lines[i+1:] {
@@ -263,8 +261,7 @@ func (s *Store) SaveProfile(p core.Profile) error {
 	if err != nil {
 		return err
 	}
-	return fsutil.AtomicWrite(filepath.Join(s.ProfilesDir(), p.Name+".json"), append(data, '
-'), 0o600)
+	return fsutil.AtomicWrite(filepath.Join(s.ProfilesDir(), p.Name+".json"), append(data, '\n'), 0o600)
 }
 
 func (s *Store) LoadProfile(name string) (core.Profile, error) {

@@ -6,7 +6,6 @@ import (
 	"path/filepath"
 	"sort"
 	"strings"
-	"time"
 
 	"github.com/charmbracelet/lipgloss"
 
@@ -170,7 +169,13 @@ func (m Model) skillListLines(width, height int) []string {
 		}
 		name := truncateText(sk.Name, nameWidth)
 		if m.searchQuery != "" {
-			name = highlightMatch(name, m.searchQuery, nameStyle.Render, m.theme.Emphasis.Copy().Underline(true).Render)
+			matchStyle := m.theme.Emphasis.Copy().Underline(true)
+			name = highlightMatch(
+				name,
+				m.searchQuery,
+				func(s string) string { return nameStyle.Render(s) },
+				func(s string) string { return matchStyle.Render(s) },
+			)
 		} else {
 			name = nameStyle.Render(name)
 		}
@@ -257,7 +262,6 @@ func (m Model) renderDetailsScreen(height int) string {
 
 func (m Model) renderFirstRun() string {
 	height := m.height
-	width := m.width
 	var lines []string
 	lines = append(lines, m.theme.Heading.Render("skillmux"), "")
 	if m.loading {

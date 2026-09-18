@@ -84,9 +84,7 @@ def scoop(version: str, checksums: dict[str, str]) -> str:
             }
         },
         "bin": "skillmux.exe",
-        "checkver": {
-            "github": f"https://github.com/{REPO}",
-        },
+        "checkver": "github",
         "autoupdate": {
             "architecture": {
                 "64bit": {

@@ -3,7 +3,7 @@ import tempfile
 import unittest
 from pathlib import Path
 
-from generate_package_manifests import homebrew, parse_checksums, scoop
+from generate_package_manifests import homebrew, parse_checksums, scoop, winget
 
 
 class PackageManifestTests(unittest.TestCase):
@@ -36,6 +36,19 @@ class PackageManifestTests(unittest.TestCase):
                 "/releases/download/v0.1.0/skillmux_windows_amd64.zip"
             )
         )
+
+    def test_winget_manifest_generation_is_pinned(self):
+        with tempfile.TemporaryDirectory() as td:
+            root = Path(td)
+            winget("0.2.0", self.checksums, root)
+            base = root / "distribution" / "winget" / "manifests" / "a" / "Auro-rium" / "Skillmux" / "0.2.0"
+            version = (base / "Auro-rium.Skillmux.yaml").read_text(encoding="utf-8")
+            installer = (base / "Auro-rium.Skillmux.installer.yaml").read_text(encoding="utf-8")
+        self.assertIn("PackageIdentifier: Auro-rium.Skillmux", version)
+        self.assertIn("ManifestVersion: 1.12.0", version)
+        self.assertIn("InstallerType: zip", installer)
+        self.assertIn("InstallerSha256: " + "5" * 64, installer)
+        self.assertIn("PortableCommandAlias: skillmux", installer)
 
     def test_checksum_parser_accepts_sha256sum_output(self):
         with tempfile.TemporaryDirectory() as td:

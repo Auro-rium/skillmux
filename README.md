@@ -23,7 +23,7 @@ By default Skillmux is installed to `~/.local/bin/skillmux`. Override with `SKIL
 Install a specific release:
 
 ```bash
-SKILLMUX_VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/Auro-rium/skillmux/main/install.sh | sh
+curl -fsSL https://raw.githubusercontent.com/Auro-rium/skillmux/main/install.sh | SKILLMUX_VERSION=v0.1.0 sh
 ```
 
 ### Windows PowerShell

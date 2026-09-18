@@ -197,12 +197,16 @@ func (e *Engine) Eject(skill string) error {
 			loc, ok := locationForScope(h.SkillLocations(e.ProjectRoot), scope)
 			if !ok { continue }
 			dst := filepath.Join(loc.Path, sk.Name)
-			if !managedTarget(dst, sk.Path) && !ownedTarget(st, sk.Name, h.Name(), dst) { continue }
-			tmp := dst + ".skillmux-eject"
-			_ = os.RemoveAll(tmp)
-			if err := fsutil.CopyDir(sk.Path, tmp); err != nil { return err }
-			if err := os.RemoveAll(dst); err != nil { return err }
-			if err := os.Rename(tmp, dst); err != nil { return err }
+			managedLink := managedTarget(dst, sk.Path)
+			ownedCopy := ownedTarget(st, sk.Name, h.Name(), dst)
+			if !managedLink && !ownedCopy { continue }
+			if managedLink {
+				tmp := dst + ".skillmux-eject"
+				_ = os.RemoveAll(tmp)
+				if err := fsutil.CopyDir(sk.Path, tmp); err != nil { return err }
+				if err := os.RemoveAll(dst); err != nil { return err }
+				if err := os.Rename(tmp, dst); err != nil { return err }
+			}
 			if st.Enabled[sk.Name] != nil {
 				st.Enabled[sk.Name][h.Name()] = false
 			}

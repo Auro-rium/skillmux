@@ -130,8 +130,10 @@ type Model struct {
 
 	conflictSel int
 	doctorSel   int
-	profileSel  int
-	harnessSel  int
+	profileSel       int
+	harnessSel       int
+	profileCreating  bool
+	profileNameInput string
 
 	profilePreview profilePreview
 
@@ -294,6 +296,11 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "profile":
 			m.pushEvent("success", msg.Text)
 			m.view = viewSync
+		case "profile-create":
+			m.pushEvent("success", msg.Text)
+			m.profileCreating = false
+			m.profileNameInput = ""
+			m.view = viewProfiles
 		case "update":
 			m.pushEvent("success", msg.Text)
 			m.view = viewMain
@@ -349,6 +356,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	}
 	if m.view == viewConfirmDelete {
 		return m.handleDeleteInput(msg)
+	}
+	if m.view == viewProfiles && m.profileCreating {
+		return m.handleProfileCreateInput(msg)
 	}
 
 	if m.view == viewPalette {
@@ -528,6 +538,7 @@ func (m Model) handleMainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "X":
 		if sk := m.selectedSkill(); sk != nil {
+			m.back = m.view
 			m.deleteInput = ""
 			m.view = viewConfirmDelete
 		}
@@ -563,6 +574,7 @@ func (m Model) handleDetailsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.view = viewMain
 	case "X":
 		if sk := m.selectedSkill(); sk != nil {
+			m.back = m.view
 			m.deleteInput = ""
 			m.view = viewConfirmDelete
 		}
@@ -579,7 +591,11 @@ func (m Model) handleDeleteInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	switch msg.String() {
 	case "esc":
 		m.deleteInput = ""
-		m.view = viewDetails
+		if m.back == viewMain || m.back == viewDetails {
+			m.view = m.back
+		} else {
+			m.view = viewMain
+		}
 	case "backspace", "ctrl+h":
 		m.deleteInput = trimLastRune(m.deleteInput)
 	case "ctrl+u":
@@ -594,6 +610,32 @@ func (m Model) handleDeleteInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	default:
 		if len(msg.Runes) > 0 {
 			m.deleteInput += string(msg.Runes)
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleProfileCreateInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	switch msg.String() {
+	case "esc":
+		m.profileCreating = false
+		m.profileNameInput = ""
+	case "backspace", "ctrl+h":
+		m.profileNameInput = trimLastRune(m.profileNameInput)
+	case "ctrl+u":
+		m.profileNameInput = ""
+	case "enter":
+		name := strings.TrimSpace(m.profileNameInput)
+		if name == "" {
+			m.pushEvent("warning", "Profile name cannot be empty")
+			return m, nil
+		}
+		m.busy = true
+		m.busyLabel = "Creating profile " + name
+		return m, profileCreateCmd(m.app, name)
+	default:
+		if len(msg.Runes) > 0 {
+			m.profileNameInput += string(msg.Runes)
 		}
 	}
 	return m, nil
@@ -904,9 +946,8 @@ func (m Model) handleProfilesKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.profilePreview = m.buildProfilePreview(p.Profile)
 		m.view = viewProfilePreview
 	case "c":
-		m.busy = true
-		m.busyLabel = "Creating profile"
-		return m, profileCreateCmd(m.app)
+		m.profileCreating = true
+		m.profileNameInput = ""
 	}
 	return m, nil
 }
@@ -1120,14 +1161,13 @@ func profileUseCmd(a *app.App, name string) tea.Cmd {
 	}
 }
 
-func profileCreateCmd(a *app.App) tea.Cmd {
+func profileCreateCmd(a *app.App, name string) tea.Cmd {
 	return func() tea.Msg {
-		name := time.Now().Format("profile-20060102-150405")
 		p, err := a.ProfileCreate(name)
 		if err != nil {
-			return operationMsg{Kind: "profile", Err: err}
+			return operationMsg{Kind: "profile-create", Err: err}
 		}
-		return operationMsg{Kind: "profile", Text: fmt.Sprintf("Created %s with %d skill(s)", p.Name, len(p.Skills))}
+		return operationMsg{Kind: "profile-create", Text: fmt.Sprintf("Created %s with %d skill(s)", p.Name, len(p.Skills))}
 	}
 }
 

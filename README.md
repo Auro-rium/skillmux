@@ -6,7 +6,7 @@ Skillmux is a local-first CLI and terminal UI for managing reusable `SKILL.md` a
 
 It keeps one canonical skill library, detects drift across harnesses, plans deterministic syncs, and refuses to silently overwrite differing unmanaged copies.
 
-> Status: early V1. Public releases are versioned, checksummed, and built automatically from `main`.
+> Status: public V1 development. Releases are versioned, checksummed, cross-platform, and built automatically from `main`.
 
 ## Install
 
@@ -49,6 +49,16 @@ brew install Auro-rium/skillmux/skillmux
 scoop bucket add skillmux https://github.com/Auro-rium/skillmux
 scoop install skillmux/skillmux
 ```
+
+### WinGet
+
+The repository carries versioned, checksum-pinned manifests ready for the Microsoft WinGet community repository:
+
+```powershell
+winget install --id Auro-rium.Skillmux -e
+```
+
+That command becomes available after the package is accepted into the public WinGet source. Until then, the submission-ready manifests live under `distribution/winget/manifests/`.
 
 ### Go
 

@@ -38,7 +38,12 @@ func (e *Engine) Plan() (core.Plan, error) {
 		for harnessName, enabled := range st.Enabled[sk.Name] {
 			h, ok := adapters[harnessName]
 			if !ok { continue }
-			target, ok := preferredLocation(h.SkillLocations(e.ProjectRoot))
+			scope := st.Scopes[sk.Name]
+			if scope == "" { scope = core.ScopeGlobal }
+			if scope == core.ScopeProject && e.ProjectRoot == "" {
+				return plan, fmt.Errorf("%s is project-scoped but no project root was found", sk.Name)
+			}
+			target, ok := locationForScope(h.SkillLocations(e.ProjectRoot), scope)
 			if !ok { continue }
 			dst := filepath.Join(target.Path, sk.Name)
 			info, statErr := os.Lstat(dst)
@@ -73,9 +78,10 @@ func (e *Engine) Plan() (core.Plan, error) {
 	return plan, nil
 }
 
-func preferredLocation(locs []core.SkillLocation) (core.SkillLocation, bool) {
-	for _, l := range locs { if l.Scope == core.ScopeGlobal { return l, true } }
-	if len(locs) > 0 { return locs[0], true }
+func locationForScope(locs []core.SkillLocation, scope core.Scope) (core.SkillLocation, bool) {
+	for _, l := range locs {
+		if l.Scope == scope { return l, true }
+	}
 	return core.SkillLocation{}, false
 }
 
@@ -96,6 +102,7 @@ func (e *Engine) Apply(plan core.Plan, force bool) error {
 	type applied struct {
 		change core.Change
 		backup string
+		linkTarget string
 		existed bool
 	}
 	var done []applied
@@ -103,7 +110,13 @@ func (e *Engine) Apply(plan core.Plan, force bool) error {
 		for i := len(done)-1; i >= 0; i-- {
 			a := done[i]
 			_ = os.RemoveAll(a.change.Target)
-			if a.existed && a.backup != "" { _ = fsutil.CopyDir(a.backup, a.change.Target) }
+			if a.existed {
+				if a.linkTarget != "" {
+					_ = os.Symlink(a.linkTarget, a.change.Target)
+				} else if a.backup != "" {
+					_ = fsutil.CopyDir(a.backup, a.change.Target)
+				}
+			}
 		}
 		return fmt.Errorf("%w; changes rolled back", cause)
 	}
@@ -112,10 +125,16 @@ func (e *Engine) Apply(plan core.Plan, force bool) error {
 			return rollback(fmt.Errorf("refusing to replace %s: %s; rerun with --force after reviewing the diff", c.Target, c.Reason))
 		}
 		a := applied{change:c}
-		if _, err := os.Lstat(c.Target); err == nil {
+		if info, err := os.Lstat(c.Target); err == nil {
 			a.existed = true
-			a.backup = filepath.Join(backupRoot, c.Harness, c.Skill)
-			if err := fsutil.CopyDir(c.Target, a.backup); err != nil { return rollback(fmt.Errorf("backup %s: %w", c.Target, err)) }
+			if info.Mode()&os.ModeSymlink != 0 {
+				link, readErr := os.Readlink(c.Target)
+				if readErr != nil { return rollback(fmt.Errorf("read symlink %s: %w", c.Target, readErr)) }
+				a.linkTarget = link
+			} else {
+				a.backup = filepath.Join(backupRoot, c.Harness, c.Skill)
+				if err := fsutil.CopyDir(c.Target, a.backup); err != nil { return rollback(fmt.Errorf("backup %s: %w", c.Target, err)) }
+			}
 		}
 		switch c.Kind {
 		case core.ChangeRemove:
@@ -142,7 +161,9 @@ func (e *Engine) Eject(skill string) error {
 		if skill != "" && sk.Name != skill { continue }
 		found = true
 		for _, h := range e.Harnesses {
-			loc, ok := preferredLocation(h.SkillLocations(e.ProjectRoot))
+			scope := sk.Scope
+			if scope == "" { scope = core.ScopeGlobal }
+			loc, ok := locationForScope(h.SkillLocations(e.ProjectRoot), scope)
 			if !ok { continue }
 			dst := filepath.Join(loc.Path, sk.Name)
 			if !managedTarget(dst, sk.Path) { continue }

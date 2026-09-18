@@ -220,7 +220,7 @@ func runSync(a *app.App, args []string) {
 	if *jsonOut { printJSON(plan) } else { renderPlan(plan) }
 	if *dry || len(plan.Changes) == 0 { return }
 
-	if !*yes {
+	if !*yes && a.Config.Sync.ConfirmChanges {
 		if !app.Confirm(bufio.NewReader(os.Stdin), "Apply? [Y/n] ") {
 			fmt.Println("Cancelled.")
 			return

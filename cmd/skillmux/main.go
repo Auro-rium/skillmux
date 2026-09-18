@@ -145,19 +145,31 @@ func require(fs *flag.FlagSet, n int) {
 func runAdd(a *app.App, args []string) {
 	fs, jsonOut := commonFlags("add")
 	targets := fs.String("target", "", "comma-separated target harnesses")
+	scope := fs.String("scope", "global", "skill scope: global or project")
 	dry := fs.Bool("dry-run", false, "show intended add without changing state")
 	parse(fs, args)
 	require(fs, 1)
+	if *scope != "global" && *scope != "project" {
+		fatal(fmt.Errorf("scope must be global or project"))
+	}
+	if *scope == "project" && a.Root == "" {
+		fatal(fmt.Errorf("project scope requires a repository root (.git or .skillmux.toml)"))
+	}
 	if *dry {
 		fmt.Printf("Would add %s", fs.Arg(0))
 		if *targets != "" { fmt.Printf(" to %s", *targets) }
-		fmt.Println()
+		fmt.Printf(" with %s scope\n", *scope)
 		return
 	}
 	var targetList []string
 	if *targets != "" { targetList = strings.Split(*targets, ",") }
 	v, err := a.Add(context.Background(), fs.Arg(0), targetList)
 	must(err)
+	if *scope == "project" {
+		must(a.Store.SetScope(v.Name, core.ScopeProject))
+		v, err = a.Get(v.Name)
+		must(err)
+	}
 	if *jsonOut { printJSON(v) } else { renderSkill(v) }
 }
 
@@ -359,7 +371,7 @@ func renderList(skills []core.Skill) {
 func renderSkill(sk core.Skill) {
 	fmt.Printf("%s\n", sk.Name)
 	if sk.Description != "" { fmt.Println(sk.Description) }
-	fmt.Printf("\nPath: %s\nHash: %s\nHealth: %s\nModified: %t\n", sk.Path, sk.Hash, sk.Health, sk.Modified)
+	fmt.Printf("\nPath: %s\nScope: %s\nHash: %s\nHealth: %s\nModified: %t\n", sk.Path, sk.Scope, sk.Hash, sk.Health, sk.Modified)
 	if sk.Source != nil { fmt.Printf("Source: %s\nCommit: %s\n", sk.Source.URL, sk.Source.Commit) }
 	var targets []string
 	for h, enabled := range sk.Enabled { if enabled { targets = append(targets, h) } }

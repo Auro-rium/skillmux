@@ -4,6 +4,8 @@ import (
 	"os"
 	"path/filepath"
 	"testing"
+
+	"github.com/Auro-rium/skillmux/internal/core"
 )
 
 func TestAdoptAndEnable(t *testing.T) {
@@ -19,4 +21,25 @@ func TestAdoptAndEnable(t *testing.T) {
 	if len(skills)!=1 { t.Fatalf("got %d skills",len(skills)) }
 	if skills[0].Description!="Reviews backend code" { t.Fatalf("description=%q",skills[0].Description) }
 	if !skills[0].Enabled["codex"] { t.Fatal("codex should be enabled") }
+}
+
+func TestSkillScopeDefaultsGlobalAndCanBeProject(t *testing.T) {
+	s, err := Open(filepath.Join(t.TempDir(), "skillmux"))
+	if err != nil { t.Fatal(err) }
+	src := filepath.Join(t.TempDir(), "scoped")
+	if err := os.MkdirAll(src, 0o755); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("# Scoped\n"), 0o644); err != nil { t.Fatal(err) }
+	if err := s.Adopt("scoped", src, nil); err != nil { t.Fatal(err) }
+
+	skills, err := s.ListSkills()
+	if err != nil { t.Fatal(err) }
+	if len(skills) != 1 || skills[0].Scope != core.ScopeGlobal {
+		t.Fatalf("expected default global scope, got %+v", skills)
+	}
+	if err := s.SetScope("scoped", core.ScopeProject); err != nil { t.Fatal(err) }
+	skills, err = s.ListSkills()
+	if err != nil { t.Fatal(err) }
+	if skills[0].Scope != core.ScopeProject {
+		t.Fatalf("expected project scope, got %q", skills[0].Scope)
+	}
 }

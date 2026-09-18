@@ -16,11 +16,29 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23.x"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - run: go test ./...
       - run: go vet ./...
+      - run: python scripts/test_generate_package_manifests.py
+
+      - name: Validate Unix installer syntax
+        if: runner.os != 'Windows'
+        shell: bash
+        run: sh -n install.sh
+
+      - name: Validate PowerShell installer syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          [scriptblock]::Create((Get-Content -Raw install.ps1)) | Out-Null
 
   build:
     runs-on: ubuntu-latest
@@ -29,4 +47,20 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23.x"
+      - name: Lint GitHub Actions workflows
+        run: |
+          go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
+          "$(go env GOPATH)/bin/actionlint"
       - run: go build -trimpath -ldflags "-s -w -X main.version=ci" -o skillmux ./cmd/skillmux
+      - name: Dry-run formal release packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh scripts/build_release.sh v0.0.0-ci
+          (
+            cd dist
+            sha256sum -c checksums.txt
+          )
+          tar -tzf dist/skillmux_linux_amd64.tar.gz | grep -qx skillmux
+          tar -tzf dist/skillmux_darwin_arm64.tar.gz | grep -qx skillmux
+          unzip -Z1 dist/skillmux_windows_amd64.zip | grep -qx skillmux.exe

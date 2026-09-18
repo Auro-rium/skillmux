@@ -2,55 +2,172 @@ name: release
 
 on:
   push:
-    tags:
-      - "v*"
+    branches: [main]
+    paths:
+      - VERSION
+      - cmd/**
+      - internal/**
+      - go.mod
+      - install.sh
+      - install.ps1
+      - scripts/build_release.sh
+      - scripts/generate_package_manifests.py
+      - .github/workflows/release.yml
+  workflow_dispatch:
 
 permissions:
   contents: write
 
+concurrency:
+  group: skillmux-release
+  cancel-in-progress: false
+
 jobs:
-  build:
-    strategy:
-      matrix:
-        include:
-          - { os: linux, arch: amd64, runner: ubuntu-latest }
-          - { os: linux, arch: arm64, runner: ubuntu-latest }
-          - { os: darwin, arch: amd64, runner: macos-latest }
-          - { os: darwin, arch: arm64, runner: macos-latest }
-          - { os: windows, arch: amd64, runner: windows-latest }
-    runs-on: ${{ matrix.runner }}
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.meta.outputs.version }}
+      tag: ${{ steps.meta.outputs.tag }}
+      should_release: ${{ steps.meta.outputs.should_release }}
     steps:
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23.x"
-      - name: Build
-        shell: bash
-        run: |
-          set -eu
-          VERSION="$GITHUB_REF_NAME"
-          mkdir -p dist
-          if [ "${{ matrix.os }}" = "windows" ]; then
-            GOOS=windows GOARCH=${{ matrix.arch }} go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o dist/skillmux.exe ./cmd/skillmux
-            cd dist && 7z a "skillmux_windows_${{ matrix.arch }}.zip" skillmux.exe
-          else
-            GOOS=${{ matrix.os }} GOARCH=${{ matrix.arch }} go build -trimpath -ldflags "-s -w -X main.version=$VERSION" -o dist/skillmux ./cmd/skillmux
-            tar -C dist -czf "dist/skillmux_${{ matrix.os }}_${{ matrix.arch }}.tar.gz" skillmux
-          fi
-      - uses: actions/upload-artifact@v4
-        with:
-          name: skillmux-${{ matrix.os }}-${{ matrix.arch }}
-          path: dist/skillmux_*
 
-  publish:
-    needs: build
+      - name: Verify source
+        run: |
+          go test ./...
+          go vet ./...
+
+      - name: Resolve release metadata
+        id: meta
+        shell: bash
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+
+          version="$(tr -d '[:space:]' < VERSION)"
+          if ! printf '%s' "$version" | grep -Eq '^[0-9]+\.[0-9]+\.[0-9]+([-.][0-9A-Za-z.-]+)?$'; then
+            echo "VERSION must contain a semantic version, got: $version" >&2
+            exit 1
+          fi
+
+          tag="v$version"
+          should_release=true
+
+          git fetch --tags --force
+
+          if git rev-parse "$tag" >/dev/null 2>&1; then
+            tagged_commit="$(git rev-list -n 1 "$tag")"
+            if [ "$tagged_commit" != "$GITHUB_SHA" ]; then
+              echo "$tag already exists at $tagged_commit, not current commit $GITHUB_SHA" >&2
+              echo "Bump VERSION before publishing a new release." >&2
+              exit 1
+            fi
+            if gh release view "$tag" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+              should_release=false
+            fi
+          fi
+
+          {
+            echo "version=$version"
+            echo "tag=$tag"
+            echo "should_release=$should_release"
+          } >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.23.x"
+
+      - name: Build release archives
+        shell: bash
+        env:
+          VERSION: ${{ needs.prepare.outputs.tag }}
+        run: |
+          set -euo pipefail
+          sh scripts/build_release.sh "$VERSION"
+          ls -lh dist
+          cat dist/checksums.txt
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: skillmux-release
+          path: dist/
+          if-no-files-found: error
+
+  publish:
+    needs: [prepare, build]
+    if: needs.prepare.outputs.should_release == 'true'
+    runs-on: ubuntu-latest
+    env:
+      GH_TOKEN: ${{ github.token }}
+      VERSION: ${{ needs.prepare.outputs.version }}
+      TAG: ${{ needs.prepare.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
       - uses: actions/download-artifact@v4
         with:
+          name: skillmux-release
           path: dist
-          merge-multiple: true
-      - uses: softprops/action-gh-release@v2
-        with:
-          files: dist/*
-          generate_release_notes: true
+
+      - name: Create tag
+        shell: bash
+        run: |
+          set -euo pipefail
+          git fetch --tags --force
+          if ! git rev-parse "$TAG" >/dev/null 2>&1; then
+            git config user.name "skillmux-release"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git tag -a "$TAG" "$GITHUB_SHA" -m "Skillmux $TAG"
+            git push origin "$TAG"
+          fi
+
+      - name: Publish GitHub Release
+        shell: bash
+        run: |
+          set -euo pipefail
+          if gh release view "$TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+            echo "Release $TAG already exists."
+          else
+            gh release create "$TAG" dist/*               --repo "$GITHUB_REPOSITORY"               --verify-tag               --title "Skillmux $TAG"               --generate-notes
+          fi
+
+      - name: Generate package-manager manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 scripts/generate_package_manifests.py             --version "$VERSION"             --checksums dist/checksums.txt
+
+          ruby -c Formula/skillmux.rb
+          python3 -m json.tool bucket/skillmux.json >/dev/null
+
+      - name: Publish package-manager manifests
+        shell: bash
+        run: |
+          set -euo pipefail
+          git config user.name "skillmux-release"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Formula/skillmux.rb bucket/skillmux.json
+
+          if git diff --cached --quiet; then
+            echo "Package manifests already current."
+            exit 0
+          fi
+
+          git commit -m "chore(release): update package manifests for $TAG"
+          git push origin HEAD:main

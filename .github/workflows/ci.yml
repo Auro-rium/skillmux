@@ -16,11 +16,29 @@ jobs:
     runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-go@v5
         with:
           go-version: "1.23.x"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
       - run: go test ./...
       - run: go vet ./...
+      - run: python scripts/test_generate_package_manifests.py
+
+      - name: Validate Unix installer syntax
+        if: runner.os != 'Windows'
+        shell: bash
+        run: sh -n install.sh
+
+      - name: Validate PowerShell installer syntax
+        if: runner.os == 'Windows'
+        shell: pwsh
+        run: |
+          [scriptblock]::Create((Get-Content -Raw install.ps1)) | Out-Null
 
   build:
     runs-on: ubuntu-latest

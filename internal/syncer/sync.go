@@ -66,7 +66,7 @@ func (e *Engine) Plan() (core.Plan, error) {
 				} else if hash != sk.Hash {
 					plan.Changes = append(plan.Changes, core.Change{Kind:core.ChangeUpdate, Skill:sk.Name, Harness:harnessName, Source:sk.Path, Target:dst, Reason:"target differs from canonical"})
 				}
-			} else if statErr == nil && managedTarget(dst, sk.Path) {
+			} else if statErr == nil && (managedTarget(dst, sk.Path) || ownedTarget(st, sk.Name, harnessName, dst)) {
 				plan.Changes = append(plan.Changes, core.Change{Kind:core.ChangeRemove, Skill:sk.Name, Harness:harnessName, Source:sk.Path, Target:dst, Reason:"disabled for target"})
 			}
 		}
@@ -83,6 +83,15 @@ func locationForScope(locs []core.SkillLocation, scope core.Scope) (core.SkillLo
 		if l.Scope == scope { return l, true }
 	}
 	return core.SkillLocation{}, false
+}
+
+func ownedTarget(st core.State, skill, harnessName, target string) bool {
+	if st.ManagedTargets[skill] == nil { return false }
+	recorded := st.ManagedTargets[skill][harnessName]
+	if recorded == "" { return false }
+	a, _ := filepath.Abs(recorded)
+	b, _ := filepath.Abs(target)
+	return a == b
 }
 
 func managedTarget(target, canonical string) bool {
@@ -149,6 +158,17 @@ func (e *Engine) Apply(plan core.Plan, force bool) error {
 			} else if err := fsutil.CopyDir(c.Source, c.Target); err != nil { return rollback(err) }
 		}
 		done = append(done, a)
+	}
+	for _, a := range done {
+		if a.change.Kind == core.ChangeRemove {
+			if err := e.Store.SetManagedTarget(a.change.Skill, a.change.Harness, ""); err != nil {
+				return rollback(fmt.Errorf("record managed target removal: %w", err))
+			}
+		} else {
+			if err := e.Store.SetManagedTarget(a.change.Skill, a.change.Harness, a.change.Target); err != nil {
+				return rollback(fmt.Errorf("record managed target: %w", err))
+			}
+		}
 	}
 	return nil
 }

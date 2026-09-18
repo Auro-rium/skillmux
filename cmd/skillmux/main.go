@@ -22,6 +22,12 @@ func main() {
 		fatal(err)
 	}
 	if len(os.Args) == 1 {
+		if !interactiveTerminal(os.Stdin) || !interactiveTerminal(os.Stdout) || strings.EqualFold(os.Getenv("TERM"), "dumb") {
+			v, err := a.Status()
+			must(err)
+			renderStatus(v)
+			return
+		}
 		if err := ui.Run(a); err != nil {
 			fatal(err)
 		}
@@ -408,6 +414,14 @@ func renderPlan(p core.Plan) {
 		fmt.Println()
 	}
 	fmt.Printf("\n%d change(s)\n", len(p.Changes))
+}
+
+func interactiveTerminal(f *os.File) bool {
+	info, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }
 
 func truncate(s string, n int) string {

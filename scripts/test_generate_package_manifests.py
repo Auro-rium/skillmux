@@ -23,6 +23,8 @@ class PackageManifestTests(unittest.TestCase):
         self.assertIn("/releases/download/v0.1.0/skillmux_linux_amd64.tar.gz", formula)
         self.assertIn("4" * 64, formula)
         self.assertIn("1" * 64, formula)
+        self.assertIn('assert_match "skillmux v#{version}"', formula)
+        self.assertIn('shell_output("#{bin}/skillmux version")', formula)
 
     def test_scoop_manifest_is_valid_and_pinned(self):
         manifest = json.loads(scoop("0.1.0", self.checksums))

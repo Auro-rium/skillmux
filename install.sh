@@ -17,23 +17,56 @@ case "$(uname -m)" in
   *) echo "skillmux: unsupported architecture" >&2; exit 1 ;;
 esac
 
+archive="skillmux_${os}_${arch}.tar.gz"
+
 if [ "$VERSION" = "latest" ]; then
-  url="https://github.com/$REPO/releases/latest/download/skillmux_$os_$arch.tar.gz"
+  base="https://github.com/$REPO/releases/latest/download"
 else
-  url="https://github.com/$REPO/releases/download/$VERSION/skillmux_$os_$arch.tar.gz"
+  case "$VERSION" in
+    v*) tag="$VERSION" ;;
+    *) tag="v$VERSION" ;;
+  esac
+  base="https://github.com/$REPO/releases/download/$tag"
 fi
 
 tmp="$(mktemp -d)"
 trap 'rm -rf "$tmp"' EXIT HUP INT TERM
-mkdir -p "$BIN_DIR"
 
-echo "Downloading $url"
-curl -fsSL "$url" -o "$tmp/skillmux.tar.gz"
-tar -xzf "$tmp/skillmux.tar.gz" -C "$tmp"
-install -m 0755 "$tmp/skillmux" "$BIN_DIR/skillmux"
+curl -fsSL "$base/$archive" -o "$tmp/$archive"
+curl -fsSL "$base/checksums.txt" -o "$tmp/checksums.txt"
+
+expected="$(awk -v f="$archive" '$2 == f || $2 == "*" f { print $1; exit }' "$tmp/checksums.txt")"
+if [ -z "$expected" ]; then
+  echo "skillmux: checksum entry for $archive was not found" >&2
+  exit 1
+fi
+
+if command -v sha256sum >/dev/null 2>&1; then
+  actual="$(sha256sum "$tmp/$archive" | awk '{print $1}')"
+elif command -v shasum >/dev/null 2>&1; then
+  actual="$(shasum -a 256 "$tmp/$archive" | awk '{print $1}')"
+else
+  echo "skillmux: neither sha256sum nor shasum is available" >&2
+  exit 1
+fi
+
+if [ "$expected" != "$actual" ]; then
+  echo "skillmux: checksum verification failed for $archive" >&2
+  exit 1
+fi
+
+mkdir -p "$tmp/extract" "$BIN_DIR"
+tar -xzf "$tmp/$archive" -C "$tmp/extract"
+install -m 0755 "$tmp/extract/skillmux" "$BIN_DIR/skillmux"
 
 echo "Installed skillmux to $BIN_DIR/skillmux"
+"$BIN_DIR/skillmux" version
+
 case ":$PATH:" in
   *":$BIN_DIR:"*) ;;
-  *) echo "Add $BIN_DIR to PATH if it is not already there." ;;
+  *)
+    echo
+    echo "$BIN_DIR is not currently on PATH."
+    echo "Add it to PATH, or run: $BIN_DIR/skillmux"
+    ;;
 esac

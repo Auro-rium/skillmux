@@ -117,7 +117,7 @@ func parse(fs *flag.FlagSet, args []string) {
 }
 
 func reorderFlags(args []string) []string {
-	valueFlags := map[string]bool{"--target": true, "-target": true, "--from": true, "-from": true}
+	valueFlags := map[string]bool{"--target": true, "-target": true, "--from": true, "-from": true, "--scope": true, "-scope": true}
 	var opts, pos []string
 	for i := 0; i < len(args); i++ {
 		a := args[i]

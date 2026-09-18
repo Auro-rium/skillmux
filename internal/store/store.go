@@ -70,6 +70,7 @@ func defaultState() core.State {
 		Enabled: map[string]map[string]bool{},
 		Sources: map[string]core.Source{},
 		Scopes: map[string]core.Scope{},
+		ManagedTargets: map[string]map[string]string{},
 	}
 }
 
@@ -90,6 +91,9 @@ func (s *Store) LoadState() (core.State, error) {
 	}
 	if st.Scopes == nil {
 		st.Scopes = map[string]core.Scope{}
+	}
+	if st.ManagedTargets == nil {
+		st.ManagedTargets = map[string]map[string]string{}
 	}
 	if st.ActiveProfile == "" {
 		st.ActiveProfile = "default"
@@ -240,6 +244,22 @@ func (s *Store) SetEnabled(skill, harness string, enabled bool) error {
 }
 
 
+
+func (s *Store) SetManagedTarget(skill, harness, target string) error {
+	st, err := s.LoadState()
+	if err != nil { return err }
+	if st.ManagedTargets[skill] == nil {
+		st.ManagedTargets[skill] = map[string]string{}
+	}
+	if target == "" {
+		delete(st.ManagedTargets[skill], harness)
+		if len(st.ManagedTargets[skill]) == 0 { delete(st.ManagedTargets, skill) }
+	} else {
+		st.ManagedTargets[skill][harness] = filepath.Clean(target)
+	}
+	return s.SaveState(st)
+}
+
 func (s *Store) SetScope(skill string, scope core.Scope) error {
 	if !fsutil.SafeName(skill) {
 		return errors.New("invalid skill name")
@@ -273,6 +293,7 @@ func (s *Store) RemoveCanonical(name string) error {
 	delete(st.Enabled, name)
 	delete(st.Sources, name)
 	delete(st.Scopes, name)
+	delete(st.ManagedTargets, name)
 	if err := os.RemoveAll(path); err != nil {
 		return err
 	}

@@ -119,9 +119,11 @@ jobs:
           build_unix darwin arm64
           build_windows amd64
 
+          cp install.sh install.ps1 dist/
+
           (
             cd dist
-            sha256sum skillmux_* > checksums.txt
+            sha256sum skillmux_* install.sh install.ps1 > checksums.txt
           )
 
           ls -lh dist

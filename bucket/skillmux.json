@@ -1,0 +1,20 @@
+{
+  "version": "0.1.0",
+  "description": "Local-first SKILL.md manager across agent harnesses",
+  "homepage": "https://github.com/Auro-rium/skillmux",
+  "architecture": {
+    "64bit": {
+      "url": "https://github.com/Auro-rium/skillmux/releases/download/v0.1.0/skillmux_windows_amd64.zip",
+      "hash": "38ad8171c5fb1ace9deec2e59b3313f68f5772ab54ba229723f923464e8caadb"
+    }
+  },
+  "bin": "skillmux.exe",
+  "checkver": "github",
+  "autoupdate": {
+    "architecture": {
+      "64bit": {
+        "url": "https://github.com/Auro-rium/skillmux/releases/download/v$version/skillmux_windows_amd64.zip"
+      }
+    }
+  }
+}

@@ -107,7 +107,7 @@ func (a *App) projectPlan(manifest *project.Manifest) (core.Plan, error) {
 			if !ok {
 				return plan, fmt.Errorf("manifest references unsupported harness %q", target)
 			}
-			dst := targetPath(h, a.Root, name)
+			dst := targetPath(h, a.Root, name, core.ScopeProject)
 			kind := core.ChangeInstall
 			if exists {
 				kind = core.ChangeUpdate
@@ -190,6 +190,10 @@ func (a *App) applyProjectManifest(ctx context.Context, manifest *project.Manife
 			}
 		}
 
+		if err := a.Store.SetScope(name, core.ScopeProject); err != nil {
+			return err
+		}
+
 		for _, h := range harness.Default() {
 			if enabled, ok := manifest.Targets[h.Name()]; ok {
 				if err := a.Store.SetEnabled(name, h.Name(), enabled); err != nil {
@@ -258,15 +262,12 @@ func pinGitHubSource(raw, commit string) string {
 	return "github:" + strings.Join(parts, "/")
 }
 
-func targetPath(h harness.Adapter, projectRoot, skill string) string {
+func targetPath(h harness.Adapter, projectRoot, skill string, scope core.Scope) string {
 	locs := h.SkillLocations(projectRoot)
 	for _, loc := range locs {
-		if loc.Scope == core.ScopeGlobal {
+		if loc.Scope == scope {
 			return filepath.Join(loc.Path, skill)
 		}
-	}
-	if len(locs) > 0 {
-		return filepath.Join(locs[0].Path, skill)
 	}
 	return skill
 }

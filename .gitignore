@@ -1,0 +1,6 @@
+/skillmux
+/bin/
+/dist/
+*.test
+*.out
+.DS_Store

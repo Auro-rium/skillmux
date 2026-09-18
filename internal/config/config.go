@@ -19,6 +19,7 @@ type Config struct {
 	}
 	TUI struct {
 		ShowHidden bool
+		Theme      string
 	}
 }
 
@@ -27,6 +28,7 @@ func Default() Config {
 	c.DefaultProfile = "default"
 	c.Sync.PreferSymlinks = true
 	c.Sync.ConfirmChanges = true
+	c.TUI.Theme = "auto"
 	return c
 }
 
@@ -73,8 +75,12 @@ func Load(path string) (Config, error) {
 				if v, err := strconv.ParseBool(value); err == nil { c.Updates.CheckOnStart = v }
 			}
 		case "tui":
-			if key == "show_hidden" {
+			switch key {
+			case "show_hidden":
 				if v, err := strconv.ParseBool(value); err == nil { c.TUI.ShowHidden = v }
+			case "theme":
+				v := strings.ToLower(unquote(value))
+				if v == "auto" || v == "dark" || v == "light" || v == "mono" { c.TUI.Theme = v }
 			}
 		}
 	}

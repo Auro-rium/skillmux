@@ -77,3 +77,41 @@ func TestProjectScopedSkillPlansProjectLocation(t *testing.T) {
 		t.Fatalf("target=%q want=%q", plan.Changes[0].Target, want)
 	}
 }
+
+func TestCopiedManagedTargetCanBeSafelyDisabled(t *testing.T) {
+	root := t.TempDir()
+	s, err := store.Open(filepath.Join(root, "state"))
+	if err != nil { t.Fatal(err) }
+	src := filepath.Join(root, "src")
+	if err := os.MkdirAll(src, 0o755); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("# Copied\n"), 0o644); err != nil { t.Fatal(err) }
+	if err := s.Adopt("copied", src, nil); err != nil { t.Fatal(err) }
+	if err := s.SetEnabled("copied", "codex", true); err != nil { t.Fatal(err) }
+
+	targetRoot := filepath.Join(root, "codex")
+	e := New(s, "")
+	e.Harnesses = []harness.Adapter{fakeHarness{targetRoot}}
+	e.PreferLinks = false
+
+	plan, err := e.Plan()
+	if err != nil { t.Fatal(err) }
+	if err := e.Apply(plan, false); err != nil { t.Fatal(err) }
+
+	target := filepath.Join(targetRoot, "copied")
+	info, err := os.Lstat(target)
+	if err != nil { t.Fatal(err) }
+	if info.Mode()&os.ModeSymlink != 0 {
+		t.Fatal("expected regular copied directory")
+	}
+
+	if err := s.SetEnabled("copied", "codex", false); err != nil { t.Fatal(err) }
+	removePlan, err := e.Plan()
+	if err != nil { t.Fatal(err) }
+	if len(removePlan.Changes) != 1 || removePlan.Changes[0].Kind != core.ChangeRemove {
+		t.Fatalf("expected managed copy removal, got %+v", removePlan)
+	}
+	if err := e.Apply(removePlan, false); err != nil { t.Fatal(err) }
+	if _, err := os.Stat(target); !os.IsNotExist(err) {
+		t.Fatalf("expected copied target removed, err=%v", err)
+	}
+}

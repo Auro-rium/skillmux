@@ -70,6 +70,8 @@ func (m Model) renderViewBody(height int) string {
 		return m.renderHelp(height)
 	case viewConfirmDisable:
 		return m.renderConfirmDisable(height)
+	case viewConfirmDelete:
+		return m.renderConfirmDelete(height)
 	case viewError:
 		return m.renderError(height)
 	default:
@@ -626,6 +628,7 @@ func (m Model) renderHelp(height int) string {
 		"v              diff",
 		"u              update",
 		"x              disable exposures",
+		"X              delete canonical copy",
 		"",
 		m.theme.Heading.Render("Environment"),
 		"s              sync",
@@ -663,6 +666,26 @@ func (m Model) renderConfirmDisable(height int) string {
 	return m.panel("Confirm", lines, m.width, height)
 }
 
+func (m Model) renderConfirmDelete(height int) string {
+	sk := m.selectedSkill()
+	if sk == nil {
+		return m.panel("Delete canonical skill", []string{"No skill selected."}, m.width, height)
+	}
+	lines := []string{
+		m.theme.Error.Render(m.sym.Error) + " " + m.theme.Heading.Render("Delete canonical skill " + sk.Name + "?"),
+		"",
+		"This permanently removes:",
+		m.theme.Error.Render(truncateText(sk.Path, maxInt(8, m.width-4))),
+		"",
+		"Harness links are ejected before the canonical copy is removed.",
+		"Backups created by Skillmux remain available.",
+		"",
+		"Type " + m.theme.Emphasis.Render(sk.Name) + " to confirm:",
+		m.deleteInput + "█",
+	}
+	return m.panel("Destructive action", lines, m.width, height)
+}
+
 func (m Model) renderError(height int) string {
 	lines := []string{m.theme.Error.Render(m.sym.Error) + " " + m.theme.Heading.Render("Operation failed"), "", truncateText(m.errorText, maxInt(10, m.width-4)), "", m.theme.Muted.Render("No success state was recorded."), "", m.theme.Key.Render("Esc")+" back"}
 	return m.panel("Error", lines, m.width, height)
@@ -691,7 +714,7 @@ func (m Model) renderFooter() string {
 	case viewMain:
 		items = [][2]string{{"/", "search"}, {"a", "add"}, {"s", "sync"}, {"d", "doctor"}, {"p", "profile"}, {"?", "help"}, {"q", "quit"}}
 	case viewDetails:
-		items = [][2]string{{"e", "edit"}, {"space", "targets"}, {"v", "diff"}, {"u", "update"}, {"x", "disable"}, {"Esc", "back"}}
+		items = [][2]string{{"e", "edit"}, {"space", "targets"}, {"v", "diff"}, {"u", "update"}, {"x", "disable"}, {"X", "delete"}, {"Esc", "back"}}
 	case viewAdd:
 		if m.addFocus == 0 {
 			items = [][2]string{{"Tab", "targets"}, {"Esc", "cancel"}}
@@ -720,6 +743,8 @@ func (m Model) renderFooter() string {
 		items = [][2]string{{"Enter", "back"}, {"Esc", "back"}}
 	case viewConfirmDisable:
 		items = [][2]string{{"y", "confirm"}, {"n", "cancel"}}
+	case viewConfirmDelete:
+		items = [][2]string{{"Enter", "confirm exact name"}, {"Esc", "cancel"}}
 	case viewPalette:
 		return fitStyled(" Command: "+truncateText(m.paletteQuery, maxInt(0, m.width-11))+"█", m.width)
 	}

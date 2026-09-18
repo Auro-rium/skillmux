@@ -57,7 +57,7 @@ func (a adapter) SupportsSymlinks() bool {
 
 func Default() []Adapter {
 	return []Adapter{
-		adapter{name:"codex", markers:[]string{"~/.codex"}, globalDirs:[]string{"~/.agents/skills", "~/.codex/skills"}, projectDirs:[]string{".agents/skills", ".codex/skills"}},
+		adapter{name:"codex", markers:[]string{"~/.codex"}, globalDirs:[]string{"~/.agents/skills"}, projectDirs:[]string{".agents/skills"}},
 		adapter{name:"claude", markers:[]string{"~/.claude"}, globalDirs:[]string{"~/.claude/skills"}, projectDirs:[]string{".claude/skills"}},
 		adapter{name:"gemini", markers:[]string{"~/.gemini"}, globalDirs:[]string{"~/.gemini/skills"}, projectDirs:[]string{".gemini/skills"}},
 		adapter{name:"cursor", markers:[]string{"~/.cursor"}, globalDirs:[]string{"~/.cursor/skills"}, projectDirs:[]string{".cursor/skills"}},

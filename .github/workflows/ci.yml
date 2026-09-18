@@ -52,3 +52,15 @@ jobs:
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           "$(go env GOPATH)/bin/actionlint"
       - run: go build -trimpath -ldflags "-s -w -X main.version=ci" -o skillmux ./cmd/skillmux
+      - name: Dry-run formal release packaging
+        shell: bash
+        run: |
+          set -euo pipefail
+          sh scripts/build_release.sh v0.0.0-ci
+          (
+            cd dist
+            sha256sum -c checksums.txt
+          )
+          tar -tzf dist/skillmux_linux_amd64.tar.gz | grep -qx skillmux
+          tar -tzf dist/skillmux_darwin_arm64.tar.gz | grep -qx skillmux
+          unzip -Z1 dist/skillmux_windows_amd64.zip | grep -qx skillmux.exe

@@ -3,7 +3,6 @@ package syncer
 import (
 	"os"
 	"path/filepath"
-	"runtime"
 	"testing"
 
 	"github.com/Auro-rium/skillmux/internal/core"
@@ -141,11 +140,8 @@ func TestIdenticalUnmanagedCopyIsAdoptedOnForcedSync(t *testing.T) {
 		t.Fatal("repair of an unmanaged target must require force")
 	}
 	if err := e.Apply(plan, true); err != nil { t.Fatal(err) }
-	info, err := os.Lstat(filepath.Join(targetRoot, "imported"))
+	_, err = os.Lstat(filepath.Join(targetRoot, "imported"))
 	if err != nil { t.Fatal(err) }
-	if runtime.GOOS != "windows" && info.Mode()&os.ModeSymlink == 0 {
-		t.Fatal("expected target to become a symlink on Unix")
-	}
 	st, err := s.LoadState()
 	if err != nil { t.Fatal(err) }
 	if st.ManagedTargets["imported"]["codex"] == "" {

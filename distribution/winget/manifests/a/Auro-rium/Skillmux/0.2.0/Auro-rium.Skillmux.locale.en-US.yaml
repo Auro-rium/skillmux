@@ -1,0 +1,21 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
+PackageIdentifier: Auro-rium.Skillmux
+PackageVersion: 0.2.0
+PackageLocale: en-US
+Publisher: Auro-rium
+PublisherUrl: https://github.com/Auro-rium
+PublisherSupportUrl: https://github.com/Auro-rium/skillmux/issues
+PackageName: Skillmux
+PackageUrl: https://github.com/Auro-rium/skillmux
+License: Proprietary
+ShortDescription: Local-first SKILL.md manager across agent harnesses.
+Description: One skill environment for Codex, Claude Code, Gemini CLI, Cursor, and OpenCode.
+Moniker: skillmux
+Tags:
+- developer-tools
+- cli
+- agents
+- skills
+- terminal
+ManifestType: defaultLocale
+ManifestVersion: 1.12.0

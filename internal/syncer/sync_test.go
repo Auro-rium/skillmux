@@ -173,3 +173,31 @@ func TestEjectClearsManagementAndDesiredExposure(t *testing.T) {
 	if err != nil { t.Fatal(err) }
 	if len(post.Changes) != 0 { t.Fatalf("ejected target must remain unmanaged: %+v", post) }
 }
+
+func TestEjectPreservesManagedCopyContents(t *testing.T) {
+	root := t.TempDir()
+	s, err := store.Open(filepath.Join(root, "state"))
+	if err != nil { t.Fatal(err) }
+	src := filepath.Join(root, "src")
+	if err := os.MkdirAll(src, 0o755); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("# Canonical\n"), 0o644); err != nil { t.Fatal(err) }
+	if err := s.Adopt("copied-eject", src, nil); err != nil { t.Fatal(err) }
+	if err := s.SetEnabled("copied-eject", "codex", true); err != nil { t.Fatal(err) }
+
+	targetRoot := filepath.Join(root, "codex")
+	e := New(s, "")
+	e.Harnesses = []harness.Adapter{fakeHarness{targetRoot}}
+	e.PreferLinks = false
+	plan, err := e.Plan()
+	if err != nil { t.Fatal(err) }
+	if err := e.Apply(plan, false); err != nil { t.Fatal(err) }
+
+	target := filepath.Join(targetRoot, "copied-eject")
+	if err := os.WriteFile(filepath.Join(target, "SKILL.md"), []byte("# Local modification\n"), 0o644); err != nil { t.Fatal(err) }
+	if err := e.Eject("copied-eject"); err != nil { t.Fatal(err) }
+	data, err := os.ReadFile(filepath.Join(target, "SKILL.md"))
+	if err != nil { t.Fatal(err) }
+	if string(data) != "# Local modification\n" {
+		t.Fatalf("eject overwrote copied contents: %q", string(data))
+	}
+}

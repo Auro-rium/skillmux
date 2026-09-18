@@ -125,10 +125,8 @@ func TestIdenticalUnmanagedCopyIsAdoptedOnForcedSync(t *testing.T) {
 	if err := os.MkdirAll(src, 0o755); err != nil { t.Fatal(err) }
 	if err := os.MkdirAll(targetRoot, 0o755); err != nil { t.Fatal(err) }
 	if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("# Same\n"), 0o644); err != nil { t.Fatal(err) }
-	if err := os.WriteFile(filepath.Join(targetRoot, "imported", "SKILL.md"), []byte("# Same\n"), 0o644); err != nil {
-		_ = os.MkdirAll(filepath.Join(targetRoot, "imported"), 0o755)
-		if err := os.WriteFile(filepath.Join(targetRoot, "imported", "SKILL.md"), []byte("# Same\n"), 0o644); err != nil { t.Fatal(err) }
-	}
+	if err := os.MkdirAll(filepath.Join(targetRoot, "imported"), 0o755); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(targetRoot, "imported", "SKILL.md"), []byte("# Same\n"), 0o644); err != nil { t.Fatal(err) }
 	if err := s.Adopt("imported", src, nil); err != nil { t.Fatal(err) }
 	if err := s.SetEnabled("imported", "codex", true); err != nil { t.Fatal(err) }
 	e := New(s, "")

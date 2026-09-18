@@ -567,7 +567,7 @@ func (m Model) renderDiff(height int) string {
 		return m.panel(title, []string{m.theme.Muted.Render("No diff loaded.")}, m.width, height)
 	}
 	all := strings.Split(strings.TrimSuffix(m.diffText, "\n"), "\n")
-	offset := clampIndex(m.doctorSel, maxInt(1, len(all)))
+	offset := clampIndex(m.diffOffset, maxInt(1, len(all)))
 	maxRows := maxInt(1, height-2)
 	if offset > maxInt(0, len(all)-maxRows) {
 		offset = maxInt(0, len(all)-maxRows)
@@ -1012,7 +1012,10 @@ func shortHash(s string) string {
 }
 
 func quoted(s string) string {
-	return "“" + s + "”"
+	if supportsUnicode() {
+		return "“" + s + "”"
+	}
+	return "\"" + s + "\""
 }
 
 func listWindow(selected, count, capacity int) (int, int) {

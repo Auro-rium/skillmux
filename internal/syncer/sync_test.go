@@ -115,3 +115,63 @@ func TestCopiedManagedTargetCanBeSafelyDisabled(t *testing.T) {
 		t.Fatalf("expected copied target removed, err=%v", err)
 	}
 }
+
+func TestIdenticalUnmanagedCopyIsAdoptedOnForcedSync(t *testing.T) {
+	root := t.TempDir()
+	s, err := store.Open(filepath.Join(root, "state"))
+	if err != nil { t.Fatal(err) }
+	src := filepath.Join(root, "src")
+	targetRoot := filepath.Join(root, "codex")
+	if err := os.MkdirAll(src, 0o755); err != nil { t.Fatal(err) }
+	if err := os.MkdirAll(targetRoot, 0o755); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("# Same\n"), 0o644); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(targetRoot, "imported", "SKILL.md"), []byte("# Same\n"), 0o644); err != nil {
+		_ = os.MkdirAll(filepath.Join(targetRoot, "imported"), 0o755)
+		if err := os.WriteFile(filepath.Join(targetRoot, "imported", "SKILL.md"), []byte("# Same\n"), 0o644); err != nil { t.Fatal(err) }
+	}
+	if err := s.Adopt("imported", src, nil); err != nil { t.Fatal(err) }
+	if err := s.SetEnabled("imported", "codex", true); err != nil { t.Fatal(err) }
+	e := New(s, "")
+	e.Harnesses = []harness.Adapter{fakeHarness{targetRoot}}
+	plan, err := e.Plan()
+	if err != nil { t.Fatal(err) }
+	if len(plan.Changes) != 1 || plan.Changes[0].Kind != core.ChangeRepair {
+		t.Fatalf("expected unmanaged identical copy repair, got %+v", plan)
+	}
+	if err := e.Apply(plan, false); err == nil {
+		t.Fatal("repair of an unmanaged target must require force")
+	}
+	if err := e.Apply(plan, true); err != nil { t.Fatal(err) }
+	info, err := os.Lstat(filepath.Join(targetRoot, "imported"))
+	if err != nil { t.Fatal(err) }
+	if info.Mode()&os.ModeSymlink == 0 { t.Fatal("expected target to become a symlink") }
+}
+
+func TestEjectClearsManagementAndDesiredExposure(t *testing.T) {
+	root := t.TempDir()
+	s, err := store.Open(filepath.Join(root, "state"))
+	if err != nil { t.Fatal(err) }
+	src := filepath.Join(root, "src")
+	if err := os.MkdirAll(src, 0o755); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("# Eject\n"), 0o644); err != nil { t.Fatal(err) }
+	if err := s.Adopt("eject", src, nil); err != nil { t.Fatal(err) }
+	if err := s.SetEnabled("eject", "codex", true); err != nil { t.Fatal(err) }
+	targetRoot := filepath.Join(root, "codex")
+	e := New(s, "")
+	e.Harnesses = []harness.Adapter{fakeHarness{targetRoot}}
+	plan, err := e.Plan()
+	if err != nil { t.Fatal(err) }
+	if err := e.Apply(plan, false); err != nil { t.Fatal(err) }
+	if err := e.Eject("eject"); err != nil { t.Fatal(err) }
+	st, err := s.LoadState()
+	if err != nil { t.Fatal(err) }
+	if st.Enabled["eject"]["codex"] {
+		t.Fatal("eject must clear desired exposure")
+	}
+	if _, ok := st.ManagedTargets["eject"]; ok {
+		t.Fatal("eject must clear managed target state")
+	}
+	post, err := e.Plan()
+	if err != nil { t.Fatal(err) }
+	if len(post.Changes) != 0 { t.Fatalf("ejected target must remain unmanaged: %+v", post) }
+}

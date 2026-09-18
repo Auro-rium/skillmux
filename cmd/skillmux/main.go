@@ -22,6 +22,12 @@ func main() {
 		fatal(err)
 	}
 	if len(os.Args) == 1 {
+		if !interactiveTerminal(os.Stdin) || !interactiveTerminal(os.Stdout) || strings.EqualFold(os.Getenv("TERM"), "dumb") {
+			v, err := a.Status()
+			must(err)
+			renderStatus(v)
+			return
+		}
 		if err := ui.Run(a); err != nil {
 			fatal(err)
 		}
@@ -331,10 +337,11 @@ func printJSON(v any) {
 }
 
 func renderScan(r core.ScanReport) {
+	ok, off := cliStatusSymbols()
 	fmt.Println("Harnesses")
 	for _, h := range r.Harnesses {
-		m := "○"
-		if h.Detected { m = "✓" }
+		m := off
+		if h.Detected { m = ok }
 		fmt.Printf("%s %s\n", m, h.Name)
 	}
 	fmt.Printf("\nSkills found: %d\nUnique skills: %d\nDuplicates: %d\nConflicts: %d\nBroken: %d\n", len(r.Installations), r.UniqueSkills, r.Duplicates, len(r.Conflicts), r.Broken)
@@ -345,10 +352,11 @@ func renderScan(r core.ScanReport) {
 }
 
 func renderStatus(s app.Status) {
+	ok, off := cliStatusSymbols()
 	fmt.Printf("Profile: %s\n\nHarnesses\n", s.Profile)
 	for _, h := range s.Harnesses {
-		m := "○"
-		if h.Detected { m = "✓" }
+		m := off
+		if h.Detected { m = ok }
 		fmt.Printf("%s %s\n", m, h.Name)
 	}
 	fmt.Printf("\nSkills: %d\nEnabled: %d\nPending sync changes: %d\nConflicts: %d\nDoctor: %d warnings, %d errors\n", s.Skills, s.Enabled, s.PendingChanges, s.Conflicts, s.DoctorWarnings, s.DoctorErrors)
@@ -386,7 +394,10 @@ func renderDoctor(r core.DoctorReport) {
 		if f.Severity == "error" { errs++ } else { warnings++ }
 		fmt.Printf("%-7s %-22s %s\n", strings.ToUpper(f.Severity), f.Skill, f.Message)
 	}
-	if len(r.Findings) == 0 { fmt.Println("✓ no findings") }
+	if len(r.Findings) == 0 {
+		ok, _ := cliStatusSymbols()
+		fmt.Printf("%s no findings\n", ok)
+	}
 	fmt.Printf("\n%d warnings\n%d errors\n", warnings, errs)
 }
 
@@ -408,6 +419,21 @@ func renderPlan(p core.Plan) {
 		fmt.Println()
 	}
 	fmt.Printf("\n%d change(s)\n", len(p.Changes))
+}
+
+func cliStatusSymbols() (ok, disabled string) {
+	if os.Getenv("SKILLMUX_ASCII") == "1" || strings.EqualFold(os.Getenv("TERM"), "dumb") {
+		return "[OK]", "[OFF]"
+	}
+	return "✓", "○"
+}
+
+func interactiveTerminal(f *os.File) bool {
+	info, err := f.Stat()
+	if err != nil {
+		return false
+	}
+	return info.Mode()&os.ModeCharDevice != 0
 }
 
 func truncate(s string, n int) string {

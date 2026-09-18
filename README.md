@@ -243,9 +243,75 @@ Disabling a skill changes exposure only; it does not delete canonical content.
 
 ## TUI
 
-Running `skillmux` with no arguments opens the terminal interface.
+Running `skillmux` with no arguments opens the terminal interface. No setup command or account is required.
 
-The V1 interface is intentionally minimal: skill health, target exposure, search, doctor results, and sync planning. Business logic stays outside the UI so CLI and TUI operate on the same rules.
+The TUI is intentionally terminal-native: monochrome-first, keyboard-driven, no Nerd Font dependency, no large background fills, and semantic color only for state.
+
+### Layout
+
+Skillmux adapts to terminal width instead of compressing panels until they become useless:
+
+- around 80 columns: skill list only; press Enter for details
+- medium terminals: skills + details
+- wide terminals: skills + details + recent activity
+
+The render path is tested at `80x24`, `120x30`, and `160x50`.
+
+### Keyboard
+
+```text
+Navigation
+j / ↓          next
+k / ↑          previous
+Enter          select
+Esc            back
+Tab            next panel
+Shift+Tab      previous panel
+
+Skills
+a              add
+space          edit target exposure
+e              edit SKILL.md
+v              diff
+u              update
+x              disable exposures
+X              delete canonical skill (typed confirmation)
+
+Environment
+s              sync
+d              doctor
+p              profiles
+h              harnesses
+c              conflicts
+
+Global
+/              fuzzy search
+Ctrl+P / :     command palette
+?              help
+q              quit
+Ctrl+C         quit immediately
+```
+
+### Screens
+
+The TUI includes first-run scan, main skills view, details, live fuzzy search, command palette, add/install, target selection, sync plan/result, conflict resolution, diff, doctor, profiles with switch preview, harness overview, update, empty state, help, destructive confirmation, and error state.
+
+Sync, doctor, conflict, profile, update, and add operations all call the same application/service layer used by the CLI.
+
+### Themes and terminal compatibility
+
+Themes are semantic rather than hardcoded throughout the renderer.
+
+```toml
+[tui]
+theme = "auto" # auto | dark | light | mono
+```
+
+`auto` is the default. Skillmux never assumes a black or white terminal background.
+
+Set `NO_COLOR=1` to suppress TUI color. Set `SKILLMUX_ASCII=1` to force ASCII status markers.
+
+When stdin or stdout is redirected, or when `TERM=dumb`, Skillmux automatically skips the full-screen TUI and emits plain CLI output instead. Subcommands are plain-text by default, so pipelines such as `skillmux list | grep backend` remain clean.
 
 ## Development
 

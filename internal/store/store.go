@@ -3,6 +3,7 @@ package store
 import (
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"runtime"
@@ -196,6 +197,9 @@ func (s *Store) Adopt(name, src string, source *core.Source) error {
 	}
 	if _, err := os.Stat(filepath.Join(src, "SKILL.md")); err != nil {
 		return errors.New("source does not contain SKILL.md")
+	}
+	if err := fsutil.ValidateTree(src); err != nil {
+		return fmt.Errorf("source contains an unsafe filesystem link: %w", err)
 	}
 	dst := s.SkillPath(name)
 	if _, err := os.Lstat(dst); err == nil {

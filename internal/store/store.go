@@ -69,6 +69,7 @@ func defaultState() core.State {
 		ActiveProfile: "default",
 		Enabled: map[string]map[string]bool{},
 		Sources: map[string]core.Source{},
+		Scopes: map[string]core.Scope{},
 	}
 }
 
@@ -86,6 +87,9 @@ func (s *Store) LoadState() (core.State, error) {
 	}
 	if st.Sources == nil {
 		st.Sources = map[string]core.Source{}
+	}
+	if st.Scopes == nil {
+		st.Scopes = map[string]core.Scope{}
 	}
 	if st.ActiveProfile == "" {
 		st.ActiveProfile = "default"
@@ -128,7 +132,8 @@ func (s *Store) ListSkills() ([]core.Skill, error) {
 			continue
 		}
 		desc, _ := description(filepath.Join(path, "SKILL.md"))
-		skill := core.Skill{Name:name, Description:desc, Path:path, Hash:hash, Managed:true, Enabled:map[string]bool{}}
+		skill := core.Skill{Name:name, Description:desc, Path:path, Hash:hash, Managed:true, Enabled:map[string]bool{}, Scope:st.Scopes[name]}
+		if skill.Scope == "" { skill.Scope = core.ScopeGlobal }
 		if src, ok := st.Sources[name]; ok {
 			cp := src
 			skill.Source = &cp
@@ -212,6 +217,7 @@ func (s *Store) Adopt(name, src string, source *core.Source) error {
 		source.ContentHash = hash
 		st.Sources[name] = *source
 	}
+	if st.Scopes[name] == "" { st.Scopes[name] = core.ScopeGlobal }
 	return s.SaveState(st)
 }
 
@@ -233,6 +239,25 @@ func (s *Store) SetEnabled(skill, harness string, enabled bool) error {
 	return s.SaveState(st)
 }
 
+
+func (s *Store) SetScope(skill string, scope core.Scope) error {
+	if !fsutil.SafeName(skill) {
+		return errors.New("invalid skill name")
+	}
+	if scope != core.ScopeGlobal && scope != core.ScopeProject {
+		return errors.New("scope must be global or project")
+	}
+	if _, err := os.Stat(s.SkillPath(skill)); err != nil {
+		return errors.New("unknown canonical skill")
+	}
+	st, err := s.LoadState()
+	if err != nil {
+		return err
+	}
+	st.Scopes[skill] = scope
+	return s.SaveState(st)
+}
+
 func (s *Store) RemoveCanonical(name string) error {
 	if !fsutil.SafeName(name) {
 		return errors.New("invalid skill name")
@@ -247,6 +272,7 @@ func (s *Store) RemoveCanonical(name string) error {
 	}
 	delete(st.Enabled, name)
 	delete(st.Sources, name)
+	delete(st.Scopes, name)
 	if err := os.RemoveAll(path); err != nil {
 		return err
 	}

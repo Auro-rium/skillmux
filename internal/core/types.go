@@ -19,6 +19,7 @@ type Skill struct {
 	Managed     bool              `json:"managed"`
 	Modified    bool              `json:"modified"`
 	Health      string            `json:"health,omitempty"`
+	Scope       Scope             `json:"scope,omitempty"`
 	Metadata    map[string]string `json:"metadata,omitempty"`
 }
 
@@ -74,6 +75,7 @@ type State struct {
 	ActiveProfile string                      `json:"active_profile"`
 	Enabled       map[string]map[string]bool `json:"enabled"`
 	Sources       map[string]Source           `json:"sources"`
+	Scopes        map[string]Scope            `json:"scopes"`
 }
 
 type Profile struct {

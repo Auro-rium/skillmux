@@ -134,8 +134,9 @@ type Model struct {
 
 	profilePreview profilePreview
 
-	diffTitle string
-	diffText  string
+	diffTitle  string
+	diffText   string
+	diffOffset int
 
 	syncResult core.Plan
 
@@ -374,8 +375,8 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 				return m, nil
 			}
 			return m, nil
-		case viewError:
-			if m.back == viewError {
+		case viewError, viewHelp, viewDiff:
+			if m.back == viewError || m.back == viewFirstRun || m.back == viewPalette {
 				m.view = viewMain
 			} else {
 				m.view = m.back
@@ -426,7 +427,13 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 	case viewHarnesses:
 		m.harnessSel = navigate(m.harnessSel, len(m.scan.Harnesses), key)
 	case viewDiff:
-		if key == "e" {
+		switch key {
+		case "j", "down":
+			lines := strings.Count(m.diffText, "\n") + 1
+			if m.diffOffset < maxInt(0, lines-1) { m.diffOffset++ }
+		case "k", "up":
+			if m.diffOffset > 0 { m.diffOffset-- }
+		case "e":
 			return m.openEditorForSelected()
 		}
 	case viewUpdate:
@@ -805,6 +812,7 @@ func (m Model) handleConflictKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 			c := m.scan.Conflicts[m.conflictSel]
 			m.diffTitle = "Conflict: " + c.Name
 			m.diffText = conflictDiff(c)
+			m.diffOffset = 0
 			m.back = viewConflicts
 			m.view = viewDiff
 		}
@@ -884,6 +892,8 @@ func (m Model) startDiff() (tea.Model, tea.Cmd) {
 	m.busy = true
 	m.busyLabel = "Loading diff"
 	m.diffTitle = "Diff: " + sk.Name
+	m.diffOffset = 0
+	m.back = m.view
 	return m, func() tea.Msg {
 		text, err := m.app.Diff(sk.Name, "")
 		return diffMsg{Text: text, Err: err}

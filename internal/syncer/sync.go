@@ -65,6 +65,8 @@ func (e *Engine) Plan() (core.Plan, error) {
 					plan.Changes = append(plan.Changes, core.Change{Kind:core.ChangeRepair, Skill:sk.Name, Harness:harnessName, Source:sk.Path, Target:dst, Reason:"target is unreadable or a broken link"})
 				} else if hash != sk.Hash {
 					plan.Changes = append(plan.Changes, core.Change{Kind:core.ChangeUpdate, Skill:sk.Name, Harness:harnessName, Source:sk.Path, Target:dst, Reason:"target differs from canonical"})
+				} else if !ownedTarget(st, sk.Name, harnessName, dst) {
+					plan.Changes = append(plan.Changes, core.Change{Kind:core.ChangeRepair, Skill:sk.Name, Harness:harnessName, Source:sk.Path, Target:dst, Reason:"target matches canonical but is not managed by Skillmux"})
 				}
 			} else if statErr == nil && (managedTarget(dst, sk.Path) || ownedTarget(st, sk.Name, harnessName, dst)) {
 				plan.Changes = append(plan.Changes, core.Change{Kind:core.ChangeRemove, Skill:sk.Name, Harness:harnessName, Source:sk.Path, Target:dst, Reason:"disabled for target"})
@@ -183,6 +185,8 @@ func (e *Engine) Apply(plan core.Plan, force bool) error {
 func (e *Engine) Eject(skill string) error {
 	skills, err := e.Store.ListSkills()
 	if err != nil { return err }
+	st, err := e.Store.LoadState()
+	if err != nil { return err }
 	found := false
 	for _, sk := range skills {
 		if skill != "" && sk.Name != skill { continue }
@@ -193,14 +197,23 @@ func (e *Engine) Eject(skill string) error {
 			loc, ok := locationForScope(h.SkillLocations(e.ProjectRoot), scope)
 			if !ok { continue }
 			dst := filepath.Join(loc.Path, sk.Name)
-			if !managedTarget(dst, sk.Path) { continue }
+			if !managedTarget(dst, sk.Path) && !ownedTarget(st, sk.Name, h.Name(), dst) { continue }
 			tmp := dst + ".skillmux-eject"
 			_ = os.RemoveAll(tmp)
 			if err := fsutil.CopyDir(sk.Path, tmp); err != nil { return err }
-			if err := os.Remove(dst); err != nil { return err }
+			if err := os.RemoveAll(dst); err != nil { return err }
 			if err := os.Rename(tmp, dst); err != nil { return err }
+			if st.Enabled[sk.Name] != nil {
+				st.Enabled[sk.Name][h.Name()] = false
+			}
+			if st.ManagedTargets[sk.Name] != nil {
+				delete(st.ManagedTargets[sk.Name], h.Name())
+			}
+		}
+		if len(st.ManagedTargets[sk.Name]) == 0 {
+			delete(st.ManagedTargets, sk.Name)
 		}
 	}
 	if skill != "" && !found { return errors.New("skill not found") }
-	return nil
+	return e.Store.SaveState(st)
 }

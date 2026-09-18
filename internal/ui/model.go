@@ -39,6 +39,7 @@ const (
 	viewUpdate
 	viewHelp
 	viewConfirmDisable
+	viewConfirmDelete
 	viewError
 )
 
@@ -140,7 +141,8 @@ type Model struct {
 
 	syncResult core.Plan
 
-	errorText string
+	errorText   string
+	deleteInput string
 
 	events []activityEvent
 }
@@ -298,6 +300,10 @@ func (m Model) Update(msg tea.Msg) (tea.Model, tea.Cmd) {
 		case "conflict":
 			m.pushEvent("success", msg.Text)
 			m.view = viewConflicts
+		case "delete":
+			m.pushEvent("success", msg.Text)
+			m.searchQuery = ""
+			m.view = viewMain
 		}
 		return m, loadDataCmd(m.app)
 	case diffMsg:
@@ -340,6 +346,9 @@ func (m Model) handleKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 
 	if m.view == viewAdd && m.addFocus == 0 {
 		return m.handleAddInput(msg)
+	}
+	if m.view == viewConfirmDelete {
+		return m.handleDeleteInput(msg)
 	}
 
 	if m.view == viewPalette {
@@ -470,6 +479,10 @@ func (m Model) handleMainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		m.selected = navigate(m.selected, len(m.filtered), "down")
 	case "k", "up":
 		m.selected = navigate(m.selected, len(m.filtered), "up")
+	case "tab", "shift+tab":
+		if m.selectedSkill() != nil {
+			m.view = viewDetails
+		}
 	case "enter":
 		if len(m.skills) == 0 {
 			m.loading = true
@@ -513,6 +526,11 @@ func (m Model) handleMainKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		if sk := m.selectedSkill(); sk != nil && enabledCount(*sk) > 0 {
 			m.view = viewConfirmDisable
 		}
+	case "X":
+		if sk := m.selectedSkill(); sk != nil {
+			m.deleteInput = ""
+			m.view = viewConfirmDelete
+		}
 	}
 	return m, nil
 }
@@ -541,6 +559,42 @@ func (m Model) handleDetailsKey(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
 		}
 	case "s":
 		m.view = viewSync
+	case "tab", "shift+tab":
+		m.view = viewMain
+	case "X":
+		if sk := m.selectedSkill(); sk != nil {
+			m.deleteInput = ""
+			m.view = viewConfirmDelete
+		}
+	}
+	return m, nil
+}
+
+func (m Model) handleDeleteInput(msg tea.KeyMsg) (tea.Model, tea.Cmd) {
+	sk := m.selectedSkill()
+	if sk == nil {
+		m.view = viewMain
+		return m, nil
+	}
+	switch msg.String() {
+	case "esc":
+		m.deleteInput = ""
+		m.view = viewDetails
+	case "backspace", "ctrl+h":
+		m.deleteInput = trimLastRune(m.deleteInput)
+	case "ctrl+u":
+		m.deleteInput = ""
+	case "enter":
+		if m.deleteInput == sk.Name {
+			m.busy = true
+			m.busyLabel = "Deleting canonical " + sk.Name
+			return m, deleteCanonicalCmd(m.app, sk.Name)
+		}
+		m.pushEvent("warning", "Confirmation text does not match the skill name")
+	default:
+		if len(msg.Runes) > 0 {
+			m.deleteInput += string(msg.Runes)
+		}
 	}
 	return m, nil
 }
@@ -1074,6 +1128,15 @@ func profileCreateCmd(a *app.App) tea.Cmd {
 			return operationMsg{Kind: "profile", Err: err}
 		}
 		return operationMsg{Kind: "profile", Text: fmt.Sprintf("Created %s with %d skill(s)", p.Name, len(p.Skills))}
+	}
+}
+
+func deleteCanonicalCmd(a *app.App, name string) tea.Cmd {
+	return func() tea.Msg {
+		if err := a.Remove(name, "", true); err != nil {
+			return operationMsg{Kind: "delete", Err: err}
+		}
+		return operationMsg{Kind: "delete", Text: name + " permanently removed from the canonical library"}
 	}
 }
 

@@ -76,6 +76,7 @@ type State struct {
 	Enabled       map[string]map[string]bool `json:"enabled"`
 	Sources       map[string]Source           `json:"sources"`
 	Scopes        map[string]Scope            `json:"scopes"`
+	ManagedTargets map[string]map[string]string `json:"managed_targets"`
 }
 
 type Profile struct {

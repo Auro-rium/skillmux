@@ -96,6 +96,70 @@ def scoop(version: str, checksums: dict[str, str]) -> str:
     return json.dumps(manifest, indent=2) + "\n"
 
 
+def winget(version: str, checksums: dict[str, str], root: Path) -> None:
+    tag = f"v{version}"
+    base_dir = root / "distribution" / "winget" / "manifests" / "a" / "Auro-rium" / "Skillmux" / version
+    base_dir.mkdir(parents=True, exist_ok=True)
+    sha = require(checksums, "skillmux_windows_amd64.zip").upper()
+    package = "Auro-rium.Skillmux"
+
+    (base_dir / f"{package}.yaml").write_text(
+        f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.version.1.12.0.schema.json
+PackageIdentifier: {package}
+PackageVersion: {version}
+DefaultLocale: en-US
+ManifestType: version
+ManifestVersion: 1.12.0
+""",
+        encoding="utf-8",
+    )
+
+    (base_dir / f"{package}.locale.en-US.yaml").write_text(
+        f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.defaultLocale.1.12.0.schema.json
+PackageIdentifier: {package}
+PackageVersion: {version}
+PackageLocale: en-US
+Publisher: Auro-rium
+PublisherUrl: https://github.com/Auro-rium
+PublisherSupportUrl: https://github.com/Auro-rium/skillmux/issues
+PackageName: Skillmux
+PackageUrl: https://github.com/Auro-rium/skillmux
+License: Proprietary
+ShortDescription: Local-first SKILL.md manager across agent harnesses.
+Description: One skill environment for Codex, Claude Code, Gemini CLI, Cursor, and OpenCode.
+Moniker: skillmux
+Tags:
+- developer-tools
+- cli
+- agents
+- skills
+- terminal
+ManifestType: defaultLocale
+ManifestVersion: 1.12.0
+""",
+        encoding="utf-8",
+    )
+
+    (base_dir / f"{package}.installer.yaml").write_text(
+        f"""# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+PackageIdentifier: {package}
+PackageVersion: {version}
+Installers:
+- Architecture: x64
+  InstallerType: zip
+  InstallerUrl: {BASE}/{tag}/skillmux_windows_amd64.zip
+  InstallerSha256: {sha}
+  NestedInstallerType: portable
+  NestedInstallerFiles:
+  - RelativeFilePath: skillmux.exe
+    PortableCommandAlias: skillmux
+ManifestType: installer
+ManifestVersion: 1.12.0
+""",
+        encoding="utf-8",
+    )
+
+
 def main() -> None:
     p = argparse.ArgumentParser()
     p.add_argument("--version", required=True)
@@ -112,6 +176,7 @@ def main() -> None:
 
     formula.write_text(homebrew(args.version, checksums), encoding="utf-8")
     bucket.write_text(scoop(args.version, checksums), encoding="utf-8")
+    winget(args.version, checksums, args.root)
 
 
 if __name__ == "__main__":

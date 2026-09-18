@@ -287,6 +287,9 @@ func (a *App) Update(ctx context.Context, only string) ([]string, error) {
 		if sk.Source == nil || sk.Source.Type != "git" { continue }
 		if sk.Modified { return updated, fmt.Errorf("%s has local modifications; refusing to update", sk.Name) }
 		raw := "github:"+sk.Source.Repository
+		if sk.Source.Version != "" {
+			raw += "@" + sk.Source.Version
+		}
 		if sk.Source.Subdir != "" { raw += "/"+sk.Source.Subdir }
 		res, err := source.Resolve(ctx, raw, a.Store.CacheDir())
 		if err != nil { return updated, err }

@@ -40,3 +40,40 @@ func TestSyncIsIdempotent(t *testing.T) {
 	if err!=nil { t.Fatal(err) }
 	if len(second.Changes)!=0 { t.Fatalf("second plan should be empty: %+v",second) }
 }
+
+type scopedHarness struct{ global, project string }
+func (f scopedHarness) Name() string { return "claude" }
+func (f scopedHarness) Detect() bool { return true }
+func (f scopedHarness) SkillLocations(string) []core.SkillLocation {
+	return []core.SkillLocation{
+		{Path:f.global, Scope:core.ScopeGlobal},
+		{Path:f.project, Scope:core.ScopeProject},
+	}
+}
+func (f scopedHarness) SupportsSymlinks() bool { return true }
+
+func TestProjectScopedSkillPlansProjectLocation(t *testing.T) {
+	root := t.TempDir()
+	s, err := store.Open(filepath.Join(root, "state"))
+	if err != nil { t.Fatal(err) }
+	src := filepath.Join(root, "src")
+	if err := os.MkdirAll(src, 0o755); err != nil { t.Fatal(err) }
+	if err := os.WriteFile(filepath.Join(src, "SKILL.md"), []byte("# Project\n"), 0o644); err != nil { t.Fatal(err) }
+	if err := s.Adopt("project-skill", src, nil); err != nil { t.Fatal(err) }
+	if err := s.SetScope("project-skill", core.ScopeProject); err != nil { t.Fatal(err) }
+	if err := s.SetEnabled("project-skill", "claude", true); err != nil { t.Fatal(err) }
+
+	global := filepath.Join(root, "global")
+	projectDir := filepath.Join(root, "repo", ".claude", "skills")
+	e := New(s, filepath.Join(root, "repo"))
+	e.Harnesses = []harness.Adapter{scopedHarness{global:global, project:projectDir}}
+	plan, err := e.Plan()
+	if err != nil { t.Fatal(err) }
+	if len(plan.Changes) != 1 {
+		t.Fatalf("expected one change, got %+v", plan)
+	}
+	want := filepath.Join(projectDir, "project-skill")
+	if plan.Changes[0].Target != want {
+		t.Fatalf("target=%q want=%q", plan.Changes[0].Target, want)
+	}
+}

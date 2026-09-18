@@ -159,16 +159,23 @@ func (e *Engine) Apply(plan core.Plan, force bool) error {
 		}
 		done = append(done, a)
 	}
+	st, err := e.Store.LoadState()
+	if err != nil { return rollback(fmt.Errorf("load state after sync: %w", err)) }
 	for _, a := range done {
+		if st.ManagedTargets[a.change.Skill] == nil {
+			st.ManagedTargets[a.change.Skill] = map[string]string{}
+		}
 		if a.change.Kind == core.ChangeRemove {
-			if err := e.Store.SetManagedTarget(a.change.Skill, a.change.Harness, ""); err != nil {
-				return rollback(fmt.Errorf("record managed target removal: %w", err))
+			delete(st.ManagedTargets[a.change.Skill], a.change.Harness)
+			if len(st.ManagedTargets[a.change.Skill]) == 0 {
+				delete(st.ManagedTargets, a.change.Skill)
 			}
 		} else {
-			if err := e.Store.SetManagedTarget(a.change.Skill, a.change.Harness, a.change.Target); err != nil {
-				return rollback(fmt.Errorf("record managed target: %w", err))
-			}
+			st.ManagedTargets[a.change.Skill][a.change.Harness] = filepath.Clean(a.change.Target)
 		}
+	}
+	if err := e.Store.SaveState(st); err != nil {
+		return rollback(fmt.Errorf("record managed targets: %w", err))
 	}
 	return nil
 }

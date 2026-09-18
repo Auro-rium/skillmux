@@ -1,0 +1,14 @@
+# yaml-language-server: $schema=https://aka.ms/winget-manifest.installer.1.12.0.schema.json
+PackageIdentifier: Auro-rium.Skillmux
+PackageVersion: 0.2.0
+Installers:
+- Architecture: x64
+  InstallerType: zip
+  InstallerUrl: https://github.com/Auro-rium/skillmux/releases/download/v0.2.0/skillmux_windows_amd64.zip
+  InstallerSha256: 595FFCE99D55E15212DED66C85142CAA1346224F4D8BB555C26ABE219B51C73C
+  NestedInstallerType: portable
+  NestedInstallerFiles:
+  - RelativeFilePath: skillmux.exe
+    PortableCommandAlias: skillmux
+ManifestType: installer
+ManifestVersion: 1.12.0

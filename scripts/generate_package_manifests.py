@@ -64,7 +64,7 @@ def homebrew(version: str, checksums: dict[str, str]) -> str:
   end
 
   test do
-    assert_match "skillmux v#{version}", shell_output("#{bin}/skillmux version")
+    assert_match "skillmux v#{{version}}", shell_output("#{{bin}}/skillmux version")
   end
 end
 '''

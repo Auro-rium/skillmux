@@ -493,6 +493,17 @@ func (m Model) renderConflicts(height int) string {
 }
 
 func (m Model) renderProfiles(height int) string {
+	if m.profileCreating {
+		lines := []string{
+			m.theme.Heading.Render("Create profile from current environment"),
+			"",
+			m.theme.Muted.Render("Name"),
+			m.profileNameInput + "█",
+			"",
+			m.theme.Muted.Render("The profile snapshots the currently enabled skills and harnesses."),
+		}
+		return m.panel("Profiles", lines, m.width, height)
+	}
 	if len(m.profiles) == 0 {
 		lines := []string{"No saved profiles.", "", m.theme.Key.Render("c") + " create from current environment"}
 		return m.panel("Profiles", lines, m.width, height)
@@ -730,7 +741,11 @@ func (m Model) renderFooter() string {
 	case viewConflicts:
 		items = [][2]string{{"1-9", "use copy"}, {"m", "manual diff"}, {"Esc", "back"}}
 	case viewProfiles:
-		items = [][2]string{{"Enter", "preview"}, {"c", "snapshot"}, {"Esc", "back"}}
+		if m.profileCreating {
+			items = [][2]string{{"Enter", "create"}, {"Esc", "cancel"}}
+		} else {
+			items = [][2]string{{"Enter", "preview"}, {"c", "create"}, {"Esc", "back"}}
+		}
 	case viewProfilePreview:
 		items = [][2]string{{"Enter", "apply"}, {"Esc", "cancel"}}
 	case viewHarnesses:

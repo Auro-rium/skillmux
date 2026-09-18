@@ -52,6 +52,11 @@ jobs:
           go install github.com/rhysd/actionlint/cmd/actionlint@v1.7.12
           "$(go env GOPATH)/bin/actionlint"
       - run: go build -trimpath -ldflags "-s -w -X main.version=ci" -o skillmux ./cmd/skillmux
+      - name: Validate published package manifests
+        run: |
+          ruby -c Formula/skillmux.rb
+          python3 -m json.tool bucket/skillmux.json >/dev/null
+
       - name: Dry-run formal release packaging
         shell: bash
         run: |

@@ -8,20 +8,66 @@ It keeps one canonical skill library, detects drift across harnesses, plans dete
 
 > Status: V1 is under active development. The core local workflow is implemented; packaging integrations will continue to harden before the first tagged release.
 
-## Install from source
+## Install
+
+### macOS / Linux
+
+The installer downloads the correct release binary and verifies it against the published SHA-256 checksums before installing:
 
 ```bash
-git clone https://github.com/Auro-rium/skillmux
-cd skillmux
-go install ./cmd/skillmux
-skillmux
+curl -fsSL https://raw.githubusercontent.com/Auro-rium/skillmux/main/install.sh | sh
 ```
 
-Or build a tiny native binary:
+By default Skillmux is installed to `~/.local/bin/skillmux`. Override with `SKILLMUX_BIN_DIR` when needed.
+
+Install a specific release:
 
 ```bash
-go build -trimpath -ldflags "-s -w" -o skillmux ./cmd/skillmux
+SKILLMUX_VERSION=v0.1.0 curl -fsSL https://raw.githubusercontent.com/Auro-rium/skillmux/main/install.sh | sh
 ```
+
+### Windows PowerShell
+
+```powershell
+irm https://raw.githubusercontent.com/Auro-rium/skillmux/main/install.ps1 | iex
+```
+
+The PowerShell installer also verifies the release SHA-256 checksum before installing.
+
+### Homebrew
+
+Skillmux publishes a Homebrew formula from this repository on every release:
+
+```bash
+brew tap Auro-rium/skillmux https://github.com/Auro-rium/skillmux
+brew install Auro-rium/skillmux/skillmux
+```
+
+### Scoop
+
+```powershell
+scoop bucket add skillmux https://github.com/Auro-rium/skillmux
+scoop install skillmux/skillmux
+```
+
+### Go
+
+```bash
+go install github.com/Auro-rium/skillmux/cmd/skillmux@latest
+```
+
+### Release binaries
+
+Every release publishes native archives for:
+
+- macOS ARM64
+- macOS x86_64
+- Linux ARM64
+- Linux x86_64
+- Windows x86_64
+- SHA-256 checksums for every archive
+
+GitHub Releases are the source of truth for binary distribution.
 
 ## Five-minute quickstart
 
@@ -203,7 +249,11 @@ The V1 interface is intentionally minimal: skill health, target exposure, search
 
 ## Development
 
+Clone the repository only when developing Skillmux itself:
+
 ```bash
+git clone https://github.com/Auro-rium/skillmux.git
+cd skillmux
 go test ./...
 go vet ./...
 go build ./cmd/skillmux

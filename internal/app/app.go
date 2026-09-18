@@ -13,6 +13,7 @@ import (
 	"strings"
 	"time"
 
+	"github.com/Auro-rium/skillmux/internal/config"
 	"github.com/Auro-rium/skillmux/internal/core"
 	"github.com/Auro-rium/skillmux/internal/doctor"
 	"github.com/Auro-rium/skillmux/internal/fsutil"
@@ -27,6 +28,7 @@ type App struct {
 	Store   *store.Store
 	Scanner *scan.Scanner
 	Syncer  *syncer.Engine
+	Config  config.Config
 	Root    string
 }
 
@@ -51,9 +53,12 @@ func Open() (*App, error) {
 	root, _ := FindProjectRoot()
 	st, err := store.Open("")
 	if err != nil { return nil, err }
+	cfg, err := config.Load(filepath.Join(st.Root, "config.toml"))
+	if err != nil { return nil, err }
 	sc := scan.New(st, root)
 	sy := syncer.New(st, root)
-	return &App{Store:st, Scanner:sc, Syncer:sy, Root:root}, nil
+	sy.PreferLinks = cfg.Sync.PreferSymlinks
+	return &App{Store:st, Scanner:sc, Syncer:sy, Config:cfg, Root:root}, nil
 }
 
 func FindProjectRoot() (string, error) {

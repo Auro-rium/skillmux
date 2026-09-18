@@ -28,6 +28,6 @@ class Skillmux < Formula
   end
 
   test do
-    assert_match "skillmux v#0.1.0", shell_output("#<built-in function bin>/skillmux version")
+    assert_match "skillmux v#{version}", shell_output("#{bin}/skillmux version")
   end
 end

@@ -6,7 +6,7 @@ Skillmux is a local-first CLI and terminal UI for managing reusable `SKILL.md` a
 
 It keeps one canonical skill library, detects drift across harnesses, plans deterministic syncs, and refuses to silently overwrite differing unmanaged copies.
 
-> Status: V1 is under active development. The core local workflow is implemented; packaging integrations will continue to harden before the first tagged release.
+> Status: early V1. Public releases are versioned, checksummed, and built automatically from `main`.
 
 ## Install
 
